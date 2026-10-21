@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Trust the Interpose CA, so TLS terminated by the proxy is accepted by this app.
+
+  Everything here sits under <debug-overrides>, which the platform ignores unless the
+  APK is debuggable — so a release build of this app trusts exactly what it would have
+  trusted anyway. <certificates src="system"/> is listed alongside because a
+  trust-anchors block replaces the default set rather than adding to it; without it the
+  debug build would trust the Interpose CA and nothing else.
+-->
+<network-security-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="@raw/interpose_ca" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

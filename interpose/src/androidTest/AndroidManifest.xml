@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Interpose's own test suite stands up a MockWebServer and a proxy, both of which bind
+  sockets. A consuming app does not need this file — any app that makes HTTP requests
+  already holds INTERNET, and the proxy runs in the app under test's own process.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

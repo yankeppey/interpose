@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Everything that does not need a device, so a broken build or a changed API is
+  # reported in a minute rather than after the emulators have booted.
+  build:
+    name: Build & ABI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # build-tools 36.0.0 is what AGP 9.4.1 resolves to; naming packages replaces the
+      # runner image's default selection rather than adding to it.
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      - name: Assemble
+        run: ./gradlew :interpose:assembleRelease :example:assembleDebug --build-cache --stacktrace
+
+      # The public API is a committed file; regenerate it with `./gradlew :interpose:apiDump`
+      # and let the diff be part of the change.
+      - name: Binary compatibility (ABI)
+        run: ./gradlew :interpose:apiCheck --build-cache --stacktrace
+
+      - name: Lint
+        run: ./gradlew :interpose:lintRelease --build-cache --stacktrace
+
+      - name: Upload lint report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-report
+          path: interpose/build/reports/lint-results-*.html
+          retention-days: 7
+
+  # Everything this library claims is about what happens on a device, so there are no
+  # unit tests to fall back on: if the emulators do not run, nothing is verified.
+  instrumented:
+    name: Instrumented (API ${{ matrix.api-level }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      # One API level failing is a result worth having on its own, so let the others
+      # finish and say what the real range is.
+      fail-fast: false
+      matrix:
+        include:
+          # The floor. Below API 29 server-side ALPN goes through the platform's own TLS
+          # stack rather than Conscrypt's modern path, which is the reason minSdk is 24
+          # and the reason this entry exists at all.
+          - api-level: 24
+            target: default
+          - api-level: 28
+            target: default
+          # Current. Also the only level that runs the example: its WebView leg needs
+          # PROXY_OVERRIDE, which arrived in WebView 87, and the WebView bundled with the
+          # API 24 and 28 system images long predates it.
+          - api-level: 36
+            target: google_apis
+            extra-tasks: ':example:connectedDebugAndroidTest'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # Without this the emulator falls back to software rendering and the run takes
+      # long enough to hit the job timeout.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # One boot per matrix entry: a cold emulator costs minutes, so the example runs
+      # inside the same session rather than paying for a second one.
+      - name: Instrumented tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          # One line, and the per-level extras come from the matrix: the action runs each
+          # line of `script` through its own `sh -c`, so a multi-line `if` arrives split
+          # and dies on the `then`. Both suites in one invocation also share a daemon.
+          script: ./gradlew :interpose:connectedDebugAndroidTest ${{ matrix.extra-tasks }} --stacktrace
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: androidTest-reports-api${{ matrix.api-level }}
+          path: |
+            **/build/reports/androidTests/
+            **/build/outputs/androidTest-results/
+          retention-days: 7

@@ -1,0 +1,98 @@
+name: Release
+
+# A pushed tag vx.y.z publishes signed artifacts to Maven Central, where they land
+# VALIDATED and wait for a manual Publish at
+# https://central.sonatype.com/publishing/deployments.
+#
+# Required repository secrets:
+#   MAVEN_CENTRAL_USERNAME, MAVEN_CENTRAL_PASSWORD,
+#   SIGNING_KEY (ASCII-armored private key), SIGNING_KEY_ID, SIGNING_KEY_PASSWORD
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish to Maven Central
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+      ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      # vanniktech signs any non-SNAPSHOT version, which is every tag. The build guards
+      # signAllPublications() on this being present, so leaving it unset would publish
+      # unsigned artifacts that Central then rejects.
+      ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+      ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+      ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+
+      # A tag may only publish the version its own commit already claims, so a tag cut on
+      # the wrong branch fails here rather than shipping a coordinate nobody meant.
+      - name: Verify the tag against the catalog version
+        id: tag
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          TAG_VERSION="${TAG#v}"
+          FILE_VERSION=$(awk -F'"' '/^interpose[[:space:]]*=/{print $2; exit}' gradle/libs.versions.toml)
+          [ "$TAG_VERSION" = "$FILE_VERSION" ] || {
+            echo "::error::tag $TAG (parsed as $TAG_VERSION) does not match interpose=$FILE_VERSION in gradle/libs.versions.toml"
+            exit 1
+          }
+          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag $TAG matches interpose=$FILE_VERSION; proceeding."
+
+      # The device suite belongs to CI, which has already run on the commit being tagged;
+      # repeating it here would add emulator flakiness to the one job that must not be
+      # re-run casually. What is cheap and worth re-checking is the published surface.
+      - name: Binary compatibility (ABI)
+        run: ./gradlew :interpose:apiCheck --build-cache --stacktrace
+
+      - name: Assemble
+        run: ./gradlew :interpose:assembleRelease --build-cache --stacktrace
+
+      - name: Publish to Maven Central
+        run: ./gradlew :interpose:publishToMavenCentral --no-configuration-cache --stacktrace
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          prerelease: ${{ contains(steps.tag.outputs.version, '-') }}
+          generate_release_notes: true
+          files: interpose/build/outputs/aar/interpose-release.aar
+
+      - name: Summary
+        if: success()
+        run: |
+          V="${{ steps.tag.outputs.version }}"
+          echo "### Released \`$V\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`eu.buney.interpose:interpose-android:$V\` -> Maven Central (**VALIDATED** — promote at https://central.sonatype.com/publishing/deployments)" >> "$GITHUB_STEP_SUMMARY"

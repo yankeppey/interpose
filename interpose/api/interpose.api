@@ -1,0 +1,105 @@
+public final class eu/buney/interpose/CapturedConnection {
+	public final fun getAtMs ()J
+	public final fun getClientProtocol ()Ljava/lang/String;
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getIntercepted ()Z
+	public final fun getPort ()I
+	public final fun getRequestLine ()Ljava/lang/String;
+	public final fun setClientProtocol (Ljava/lang/String;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class eu/buney/interpose/CapturedExchange {
+	public final fun getAtMs ()J
+	public final fun getClientProtocol ()Ljava/lang/String;
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getMethod ()Ljava/lang/String;
+	public final fun getParams ()Ljava/util/Map;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getQuery ()Ljava/util/Map;
+	public final fun getRequestBody ()Ljava/lang/String;
+	public final fun getRequestHeaders ()Lokhttp3/Headers;
+	public final fun getResponseBody ()Ljava/lang/String;
+	public final fun getResponseHeaders ()Lokhttp3/Headers;
+	public final fun getStatus ()I
+	public final fun getUpstreamProtocol ()Ljava/lang/String;
+	public final fun getUrl ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class eu/buney/interpose/CertificateAuthority {
+	public static final field Companion Leu/buney/interpose/CertificateAuthority$Companion;
+	public synthetic fun <init> (Lokhttp3/tls/HeldCertificate;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun certificate ()Ljava/security/cert/X509Certificate;
+	public static final fun fromPem (Ljava/lang/String;)Leu/buney/interpose/CertificateAuthority;
+	public static final fun generate ()Leu/buney/interpose/CertificateAuthority;
+	public static final fun generate (Ljava/lang/String;)Leu/buney/interpose/CertificateAuthority;
+	public static final fun generate (Ljava/lang/String;J)Leu/buney/interpose/CertificateAuthority;
+	public final fun toPem ()Ljava/lang/String;
+}
+
+public final class eu/buney/interpose/CertificateAuthority$Companion {
+	public final fun fromPem (Ljava/lang/String;)Leu/buney/interpose/CertificateAuthority;
+	public final fun generate ()Leu/buney/interpose/CertificateAuthority;
+	public final fun generate (Ljava/lang/String;)Leu/buney/interpose/CertificateAuthority;
+	public final fun generate (Ljava/lang/String;J)Leu/buney/interpose/CertificateAuthority;
+	public static synthetic fun generate$default (Leu/buney/interpose/CertificateAuthority$Companion;Ljava/lang/String;JILjava/lang/Object;)Leu/buney/interpose/CertificateAuthority;
+}
+
+public final class eu/buney/interpose/Interpose {
+	public static final field INSTANCE Leu/buney/interpose/Interpose;
+	public final fun install (Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun install$default (Leu/buney/interpose/Interpose;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun isInstalled ()Z
+	public final fun proxy ()Leu/buney/interpose/InterposeProxy;
+	public final fun proxyOrNull ()Leu/buney/interpose/InterposeProxy;
+	public final fun uninstall ()V
+}
+
+public final class eu/buney/interpose/InterposeConfig {
+	public final fun certificateAuthority (Leu/buney/interpose/CertificateAuthority;)V
+	public final fun certificateAuthority (Lkotlin/jvm/functions/Function0;)V
+	public final fun intercept (Ljava/util/Collection;)V
+	public final fun intercept ([Ljava/lang/String;)V
+	public final fun offer (Ljava/util/List;)V
+	public final fun offer ([Lokhttp3/Protocol;)V
+	public final fun upstream (Leu/buney/interpose/UpstreamProtocol;)V
+	public final fun upstreamClient (Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class eu/buney/interpose/InterposeConfigKt {
+	public static final fun interposeProxy (Lkotlin/jvm/functions/Function1;)Leu/buney/interpose/InterposeProxy;
+	public static synthetic fun interposeProxy$default (Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Leu/buney/interpose/InterposeProxy;
+}
+
+public final class eu/buney/interpose/InterposeProxy {
+	public final fun awaitConnection (JLkotlin/jvm/functions/Function1;)Leu/buney/interpose/CapturedConnection;
+	public final fun awaitExchange (JLkotlin/jvm/functions/Function1;)Leu/buney/interpose/CapturedExchange;
+	public final fun connections ()Ljava/util/List;
+	public final fun exchanges ()Ljava/util/List;
+	public final fun getPort ()I
+	public final fun start ()V
+	public final fun stop ()V
+}
+
+public class eu/buney/interpose/InterposeRunner : androidx/test/runner/AndroidJUnitRunner {
+	public static final field ARG_ENABLED Ljava/lang/String;
+	public static final field ARG_INTERCEPT Ljava/lang/String;
+	public static final field Companion Leu/buney/interpose/InterposeRunner$Companion;
+	public fun <init> ()V
+	protected fun configure (Leu/buney/interpose/InterposeConfig;Landroid/os/Bundle;)V
+	protected fun isEnabled (Landroid/os/Bundle;)Z
+	public fun onCreate (Landroid/os/Bundle;)V
+}
+
+public final class eu/buney/interpose/InterposeRunner$Companion {
+}
+
+public final class eu/buney/interpose/UpstreamProtocol : java/lang/Enum {
+	public static final field MIRROR_CLIENT Leu/buney/interpose/UpstreamProtocol;
+	public static final field PREFER_HTTP_2 Leu/buney/interpose/UpstreamProtocol;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Leu/buney/interpose/UpstreamProtocol;
+	public static fun values ()[Leu/buney/interpose/UpstreamProtocol;
+}
+

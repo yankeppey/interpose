@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only overlay. The trust anchor is wired in here rather than in the main manifest
+  so that a release build of this app has no reference to it at all — not even an unused
+  resource — and so that copying this pattern into a real app cannot weaken what ships.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>
